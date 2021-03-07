@@ -1,6 +1,8 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
+__all__ = ['StratifiedKFoldReg']
+
 class StratifiedKFoldReg(StratifiedKFold):
     
     """

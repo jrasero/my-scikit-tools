@@ -8,7 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from joblib import Memory
 from tempfile import mkdtemp
 
- 
+__all__ = ['PCARegressionCV', 'PCARegression'] 
+
 class PCARegressionCV():
     
     def __init__(self, 
