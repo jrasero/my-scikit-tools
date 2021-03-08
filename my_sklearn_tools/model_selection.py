@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
+from sklearn.utils import check_random_state
 
 __all__ = ['StratifiedKFoldReg']
 
@@ -20,7 +21,7 @@ class StratifiedKFoldReg(StratifiedKFold):
         
         # Number of labels to discretize our target variable,
         # into bins of quasi equal size
-        n_labels = int(np.round(n_samples/self.n_splits))
+        n_labels = int(np.floor(n_samples/self.n_splits))
         
         # Assign a label to each bin of n_splits points
         y_labels_sorted = np.concatenate([np.repeat(ii, self.n_splits) \
@@ -35,7 +36,8 @@ class StratifiedKFoldReg(StratifiedKFold):
         
         # sample randomly the label idxs to which assign the 
         # the mod points
-        rand_label_ix = np.random.choice(labels_idx, mod, replace=False)
+        rnd = check_random_state(self.random_state)
+        rand_label_ix = rnd.choice(labels_idx, mod, replace=False)
 
         # insert these at the beginning of the corresponding bin
         y_labels_sorted = np.insert(y_labels_sorted, 
