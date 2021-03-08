@@ -69,7 +69,7 @@ class PCARegressionCV():
         alphas =  10**np.linspace(-4, 2, 100)
         l1_ratio = [0.25, 0.5, 0.75]
         param_grids = {
-            'lasso': {'lasso_alpha': alphas},
+            'lasso': {'lasso__alpha': alphas},
             'ridge': {'ridge__alpha': alphas},
             'elasticnet':  {'elasticnet__alpha': alphas, 
                             'elasticnet__l1_ratio': l1_ratio},
