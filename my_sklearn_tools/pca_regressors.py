@@ -15,13 +15,15 @@ class PCARegressionCV():
     def __init__(self, 
                  cv=None, 
                  n_jobs=None, 
-                 cache_dir=True, 
+                 cache_dir=True,
+                 scale=False, 
                  verbose=0):
         
         self.cv = cv
         self.n_jobs=n_jobs
         self.cache_dir = cache_dir
         self.verbose = verbose
+        self.scale = scale
     
     
     def build(self, reg_type):
@@ -38,9 +40,13 @@ class PCARegressionCV():
             memory = Memory(location=tmpfolder)
         else:
             memory=None
-            
-        pip = make_pipeline(VarianceThreshold(), StandardScaler(), PCA(), reg, 
-                            memory=memory)
+        
+        if self.scale:
+            pip = make_pipeline(VarianceThreshold(), StandardScaler(), PCA(), reg, 
+                                memory=memory)
+        else:
+            pip = make_pipeline(VarianceThreshold(), PCA(), reg, 
+                                memory=memory)
         
     
         param_grid = self._get_param_grid(reg_type)
@@ -84,8 +90,10 @@ class PCARegressionCV():
 
 class PCARegression():
     
-    def __init__(self, 
+    def __init__(self,
+                 scale=False, 
                  cache_dir=False):
+        self.scale = scale
         self.cache_dir = cache_dir
     
     
@@ -105,8 +113,12 @@ class PCARegression():
         else:
             memory=None
             
-        pip = make_pipeline(VarianceThreshold(), StandardScaler(), PCA(), reg, 
-                            memory=memory)         
+        if self.scale:
+            pip = make_pipeline(VarianceThreshold(), StandardScaler(), PCA(), reg, 
+                                memory=memory)
+        else:
+            pip = make_pipeline(VarianceThreshold(), PCA(), reg, 
+                                memory=memory)       
     
         return pip
     def _get_regressor(self, reg_type):
