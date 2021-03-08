@@ -17,16 +17,35 @@ class StratifiedKFoldReg(StratifiedKFold):
     def split(self, X, y, groups=None):
         
         n_samples = len(y)
+        
+        # Number of labels to discretize our target variable,
+        # into bins of quasi equal size
+        n_labels = int(np.round(n_samples/self.n_splits))
+        
+        # Get number of points that would fall
+        # out of the equally-sized bins
+        mod = np.mod(n_samples, self.n_splits)
+        
+        y_labels_sorted = np.concatenate([np.repeat(ii, self.n_splits) \
+            for ii in range(n_labels)])
+        
+        # Find unique idxs of first unique label's ocurrence
+        _, labels_idx = np.unique(y_labels_sorted, return_index=True)
+        
+        # sample randomly the label idxs to which the assign the 
+        # the mod points
+        rand_label_ix = np.random.choice(labels_idx, mod, replace=False)
 
-        # This little correction is to guarantee that 
-        # each bin has at least n_split points within it
+        # insert these before 
+        y_labels_sorted = np.insert(y_labels_sorted, rand_label_ix, y_labels_sorted[rand_label_ix])
+        
+        # find each element of y which label corresponds in the sorted 
+        # array of labels
+        map_labels_y = dict()
+        for ix, label in zip(np.argsort(y), y_labels_sorted):
+            map_labels_y[ix] = label
+    
+        # put labels according to the given y order then
+        y_labels = np.array([map_labels_y[ii] for ii in range(n_samples)])
 
-        if n_samples % self.n_splits==0:
-            num = int(n_samples/self.n_splits)
-        else:
-            num = int(n_samples/(1 + self.n_splits))
-
-        q = np.quantile(y, np.linspace(0, 1, num, endpoint=False))
-        y_bin = np.digitize(y, q)
-
-        return super().split(X, y_bin, groups)
+        return super().split(X, y_labels, groups)
