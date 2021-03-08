@@ -13,17 +13,18 @@ __all__ = ['PCARegressionCV', 'PCARegression']
 class PCARegressionCV():
     
     def __init__(self, 
-                 cv=None, 
-                 n_jobs=None, 
-                 cache_dir=True,
-                 scale=False, 
-                 verbose=0):
+                scale=False,
+                cv=None, 
+                n_jobs=None, 
+                cache_dir=True,  
+                verbose=0):
         
+        self.scale = scale
         self.cv = cv
         self.n_jobs=n_jobs
         self.cache_dir = cache_dir
         self.verbose = verbose
-        self.scale = scale
+        
     
     
     def build(self, reg_type):
