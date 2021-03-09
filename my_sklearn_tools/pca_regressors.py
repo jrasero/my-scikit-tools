@@ -38,7 +38,7 @@ class PCARegressionCV():
             
         if self.cache_dir:
             tmpfolder = mkdtemp()
-            memory = Memory(location=tmpfolder)
+            memory = Memory(location=tmpfolder, self.verbose)
         else:
             memory=None
         
@@ -93,9 +93,11 @@ class PCARegression():
     
     def __init__(self,
                  scale=False, 
-                 cache_dir=False):
+                 cache_dir=False, 
+                 verbose=0):
         self.scale = scale
         self.cache_dir = cache_dir
+        self.verbose = verbose
     
     
     def build(self, reg_type):
@@ -110,7 +112,7 @@ class PCARegression():
              
         if self.cache_dir:
             tmpfolder = mkdtemp()
-            memory = Memory(location=tmpfolder)
+            memory = Memory(location=tmpfolder, self.verbose)
         else:
             memory=None
             
