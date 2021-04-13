@@ -4,7 +4,13 @@ Being tired of defining the same lines of code every time that I use specific th
 I decided to implement these in this package, so that I just need to 
 import the particular tools that I need.
 
-Under development
+Up to now, the tools implemented are:
+
+  - A module for principal component regression, which include also different regularisation terms.
+  - A stratifiedKFold object for regression.
+  - A module for connectivity-based predictive modelling.
+
+Under continuously development.
 
 # How to install
 
