@@ -106,6 +106,12 @@ class CPMRegression(BaseCPM):
 
         return scores  # scores.ravel() if scores.shape[1] == 1 else scores
 
+    def score(self, X, y, sample_weight=None):
+        """Return the coefficient of determination of the prediction."""
+        from sklearn.metrics import r2_score
+        y_pred = self.predict(X)
+        return r2_score(y, y_pred, sample_weight=sample_weight)
+
 
 class CPMClassification(BaseCPM):
     """Connecivity-based predictive modelling for classification."""
