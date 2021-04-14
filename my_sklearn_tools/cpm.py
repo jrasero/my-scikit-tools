@@ -43,8 +43,6 @@ class BaseCPM(BaseEstimator):
         else:
             X_strength = np.column_stack((pos_features, neg_features))
         # Add intercept
-        intercept = np.ones(X.shape[0])
-        X_strength = np.column_stack((intercept, X_strength))
         return X_strength
 
     def _check_mode(self):
@@ -55,6 +53,12 @@ class BaseCPM(BaseEstimator):
         if strength_cond is False:
             raise ValueError("strength mode should be 'positive',"
                              "'negative', or 'both'.")
+            
+    def transform(self, X):
+        """Function to transform the data to the strength features."""
+        check_is_fitted(self.filter_method_)
+        
+        return self._strength_features(X)
 
 
 class CPMRegression(BaseCPM):
@@ -77,6 +81,9 @@ class CPMRegression(BaseCPM):
 
         # Matrix of strengths
         X_strength = self._strength_features(X)
+        # Add intercept
+        intercept = np.ones(X_strength.shape[0])
+        X_strength = np.column_stack((intercept, X_strength))
 
         coefs, _, _, _ = np.linalg.lstsq(X_strength, y, rcond=None)
 
@@ -101,7 +108,7 @@ class CPMRegression(BaseCPM):
 
         X_strength = self._strength_features(X)
 
-        scores = safe_sparse_dot(X_strength[:, 1:], self.coef_.T,
+        scores = safe_sparse_dot(X_strength, self.coef_.T,
                                  dense_output=True) + self.intercept_
 
         return scores  # scores.ravel() if scores.shape[1] == 1 else scores
