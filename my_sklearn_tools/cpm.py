@@ -7,10 +7,11 @@ from scipy import stats
 
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import GenericUnivariateSelect
-# from scipy.spatial.distance import squareform
 from sklearn.utils import check_X_y, check_array
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.extmath import safe_sparse_dot, row_norms
+
+from sklearn.linear_model import LinearRegression, LogisticRegression
 
 
 class BaseCPM(BaseEstimator):
@@ -19,11 +20,14 @@ class BaseCPM(BaseEstimator):
     def __init__(self,
                  mode='fpr',
                  param=0.05,
-                 strength='both'):
+                 strength='both',
+                 **kwds):
 
         self.mode = mode
         self.param = param
         self.strength = strength
+
+        super().__init__(**kwds)
 
     def _strength_features(self, X):
         """Compute the strength features."""
@@ -53,16 +57,18 @@ class BaseCPM(BaseEstimator):
         if strength_cond is False:
             raise ValueError("strength mode should be 'positive',"
                              "'negative', or 'both'.")
-            
+
     def transform(self, X):
         """Function to transform the data to the strength features."""
         check_is_fitted(self.filter_method_)
-        
         return self._strength_features(X)
 
 
-class CPMRegression(BaseCPM):
+class CPMRegression(BaseCPM, LinearRegression):
     """Connecivity-based predictive modelling for regression."""
+
+    def __init__(self, **kwds):
+        super().__init__(**kwds)
 
     def fit(self, X, y, sample_weight=None):
         """Fit method."""
@@ -81,18 +87,65 @@ class CPMRegression(BaseCPM):
 
         # Matrix of strengths
         X_strength = self._strength_features(X)
-        # Add intercept
-        intercept = np.ones(X_strength.shape[0])
-        X_strength = np.column_stack((intercept, X_strength))
 
-        coefs, _, _, _ = np.linalg.lstsq(X_strength, y, rcond=None)
+        super().fit(X_strength, y)
+        return self
 
-        if y.ndim < 2:
-            self.intercept_ = coefs[0]
-            self.coef_ = coefs[1:]
-        else:
-            self.intercept_ = coefs[0, :]
-            self.coef_ = coefs[1:, :].T  # To swap dimensions
+    def predict(self, X):
+        """Predict method."""
+        check_is_fitted(self)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
+
+        n_features = self.n_features_
+        if X.shape[1] != n_features:
+            raise ValueError("X has %d features per sample; expecting %d"
+                             % (X.shape[1], n_features))
+
+        X_strength = self._strength_features(X)
+
+        scores = super().predict(X_strength)
+        return scores  # scores.ravel() if scores.shape[1] == 1 else scores
+
+    def score(self, X, y, sample_weight=None):
+        """Return the coefficient of determination of the prediction."""
+        from sklearn.metrics import r2_score
+        y_pred = self.predict(X)
+        return r2_score(y, y_pred, sample_weight=sample_weight)
+
+
+class CPMClassification(BaseCPM, LogisticRegression):
+    """Connecivity-based predictive modelling for classification."""
+
+    def __init__(self,
+                 penalty='none',
+                 class_weight='balanced',
+                 **kwds):
+
+        super().__init__(penalty=penalty,
+                         class_weight=class_weight,
+                         **kwds)
+
+    def fit(self, X, y, sample_weight=None):
+        """Fit method."""
+        # Assert strength mode
+        self._check_mode()
+
+        # For now, just only with on target.
+        X, y = check_X_y(X, y, multi_output=False, y_numeric=True)
+        self.n_features_ = X.shape[1]
+        # We keep using f_correlation. This is similar to computing the
+        # point biserial correlation.
+        filter_method = GenericUnivariateSelect(score_func=f_correlation,
+                                                mode=self.mode,
+                                                param=self.param
+                                                )
+        filter_method.fit(X, y)
+        self.filter_method_ = filter_method
+
+        # Matrix of strengths
+        X_strength = self._strength_features(X)
+
+        super().fit(X_strength, y)
 
         return self
 
@@ -108,27 +161,15 @@ class CPMRegression(BaseCPM):
 
         X_strength = self._strength_features(X)
 
-        scores = safe_sparse_dot(X_strength, self.coef_.T,
-                                 dense_output=True) + self.intercept_
+        scores = super().predict(X_strength)
 
         return scores  # scores.ravel() if scores.shape[1] == 1 else scores
 
     def score(self, X, y, sample_weight=None):
         """Return the coefficient of determination of the prediction."""
-        from sklearn.metrics import r2_score
+        from sklearn.metrics import balanced_accuracy_score
         y_pred = self.predict(X)
-        return r2_score(y, y_pred, sample_weight=sample_weight)
-
-
-class CPMClassification(BaseCPM):
-    """Connecivity-based predictive modelling for classification."""
-
-    def __init__(self,
-                 mode='fpr',
-                 param=0.05,
-                 strength='both'):
-
-        raise NotImplementedError
+        return balanced_accuracy_score(y, y_pred, sample_weight=sample_weight)
 
 
 def f_correlation(X, y, *, center=True):
