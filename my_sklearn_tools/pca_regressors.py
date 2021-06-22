@@ -17,7 +17,8 @@ from sklearn.utils import check_X_y
 
 from .model_selection import check_cv
 
-__all__ = ['PCARegressionCV', 'PCARegression', 'LassoPCR']
+__all__ = ['PCARegressionCV', 'PCARegression',
+           'LassoPCR', 'RidgePCR', 'ElasticnetPCR']
 
 
 class PCARegressionCV():
@@ -240,6 +241,18 @@ class LassoPCR(BasePCR):
         self.best_estimator_ = pip_opt
 
         return self
+
+
+class RidgePCR(BasePCR):
+
+    def __init__(self):
+        raise NotImplementedError
+
+
+class ElasticnetPCR(BasePCR):
+
+    def __init__(self):
+        raise NotImplementedError
 
 
 def _cv_optimize(cv_estims,
