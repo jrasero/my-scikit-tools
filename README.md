@@ -6,7 +6,7 @@ import the particular tools that I need.
 
 Up to now, the tools implemented are:
 
-  - A module for principal component regression, which include also different regularisation terms.
+  - A module for principal component regression. This module includes an object that simply builds either a Pipeline or a GridSearchCV with a pipeline that concatenates a Variance Threshold feature selection, Scaling, PCA and a  linear regressor with regularisation (None, L1, L2 or ElasticNet). Alternatively, there are also coded LassoPCR, RidgePCR and ElasticnetPCR objects that in principle should be much faster than using GridSearchCV.
   - A stratifiedKFold object for regression.
   - A module for connectivity-based predictive modelling.
 
