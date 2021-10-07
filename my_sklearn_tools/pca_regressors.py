@@ -13,7 +13,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.utils import check_X_y
-
+from sklearn.utils.validation import check_is_fitted
 
 from .model_selection import check_cv
 
@@ -151,10 +151,29 @@ class PCARegression():
 class BasePCR(BaseEstimator):
 
     def predict(self, X):
+
+        check_is_fitted(self)
+
         return self.best_estimator_.predict(X)
 
     def score(self, X, y):
+
+        check_is_fitted(self)
+
         return self.best_estimator_.score(X, y)
+
+    def get_weights(self):
+
+        check_is_fitted(self)
+
+        V = self.best_estimator_.named_steps['pca'].components_
+        beta = self.best_estimator_.named_steps[-1].coef_
+        insert_features = self.best_estimator_.\
+            named_steps['variancethreshold'].inverse_transform
+        w = V.T @ beta
+        # Insert discarded voxels
+        w = np.squeeze(insert_features(w[None, :]))
+        return w
 
 
 class LassoPCR(BasePCR):
@@ -239,6 +258,9 @@ class LassoPCR(BasePCR):
         pip_opt = make_pipeline(vt, ss, pca, lasso_opt)
         pip_opt.fit(X, y)
         self.best_estimator_ = pip_opt
+
+        # Save weights in feature space
+        self.weights_ = self.get_weights()
 
         return self
 
