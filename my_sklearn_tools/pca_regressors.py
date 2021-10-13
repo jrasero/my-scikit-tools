@@ -174,7 +174,7 @@ class BasePCR(BaseEstimator):
             named_steps['variancethreshold'].inverse_transform
         if beta.ndim == 1:
             beta = beta[None, :]
-        w = beta @ V.T
+        w = beta @ V
         # Insert discarded voxels
         w = insert_features(w)
         if w.shape[0] == 0:

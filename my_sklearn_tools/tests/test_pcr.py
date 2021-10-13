@@ -72,7 +72,7 @@ def test_logistic_pcr():
 
     pip = make_pipeline(VarianceThreshold(),
                         StandardScaler(with_std=False),
-                        PCA(),
+                        PCA(n_components=5),
                         LogisticRegression(random_state=0, max_iter=10000)
                         )
 
@@ -96,6 +96,7 @@ def test_logistic_pcr():
     c_opt_1 = clf.best_params_['logisticregression__C']
 
     log_pcr = LogisticPCR(cv=cv, Cs=Cs,
+                          pca_kws={'n_components': 5},
                           logistic_kws={'random_state': 0, 'max_iter': 10000}
                           )
     t_0 = time()
