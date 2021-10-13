@@ -7,13 +7,15 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import GridSearchCV
 from sklearn import linear_model
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.linear_model._coordinate_descent import _alpha_grid
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.utils import check_X_y
+from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics import get_scorer
 
 from .model_selection import check_cv
 
@@ -160,20 +162,37 @@ class BasePCR(BaseEstimator):
 
         check_is_fitted(self)
 
-        return self.best_estimator_.score(X, y)
+        return self.scorer_(self.best_estimator_, X, y)
 
     def get_weights(self):
 
         check_is_fitted(self)
 
         V = self.best_estimator_.named_steps['pca'].components_
-        beta = self.best_estimator_.named_steps[-1].coef_
+        beta = self.best_estimator_.steps[-1][1].coef_
         insert_features = self.best_estimator_.\
             named_steps['variancethreshold'].inverse_transform
-        w = V.T @ beta
+        if beta.ndim == 1:
+            beta = beta[None, :]
+        w = beta @ V
         # Insert discarded voxels
-        w = np.squeeze(insert_features(w[None, :]))
+        w = insert_features(w)
+        if w.shape[0] == 0:
+            w = w[0, :]
         return w
+
+    def _get_pca(self):
+
+        vt = VarianceThreshold()
+        ss = StandardScaler(with_std=self.scale)
+
+        if self.pca_kws is None:
+            pca = PCA()
+        else:
+            pca = PCA(**self.pca_kws)
+        self.pca_kws = pca.get_params()
+
+        return make_pipeline(vt, ss, pca)
 
 
 class LassoPCR(BasePCR):
@@ -209,16 +228,7 @@ class LassoPCR(BasePCR):
         cv = check_cv(self.cv, y, classifier=False)
         splits = list(cv.split(X, y,))
 
-        vt = VarianceThreshold()
-        ss = StandardScaler(with_std=self.scale)
-
-        if self.pca_kws is None:
-            pca = PCA()
-        else:
-            pca = PCA(**self.pca_kws)
-        self.pca_kws = pca.get_params()
-
-        pip_transf = make_pipeline(vt, ss, pca)
+        pip_transf = self._get_pca()
 
         if self.lasso_kws is None:
             lasso = Lasso()
@@ -240,13 +250,15 @@ class LassoPCR(BasePCR):
 
         estimators = [Lasso(alpha=alpha, **lasso_kws) for alpha in alphas]
 
-        score = check_scoring(self.scoring)
+        self.scorer_ = get_scorer(self.scoring)
 
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)
 
         scores_cv = parallel(
             delayed(_cv_optimize)(
-                estimators.copy(), X, y, train, val, clone(pip_transf), score
+                estimators.copy(), X, y, train, val,
+                clone(pip_transf),
+                self.scorer_
                 ) for train, val in splits)
         scores_cv = np.column_stack(scores_cv)
         self.scores_cv_ = scores_cv
@@ -255,10 +267,98 @@ class LassoPCR(BasePCR):
         self.alpha_ = alpha_opt
 
         lasso_opt = Lasso(alpha=alpha_opt, **lasso_kws)
-        pip_opt = make_pipeline(vt, ss, pca, lasso_opt)
+        pip_opt = clone(pip_transf)
+        pip_opt.steps.append(make_pipeline(lasso_opt).steps[0])
         pip_opt.fit(X, y)
         self.best_estimator_ = pip_opt
 
+        # Save singular matrix and beta coefficients in component space
+        self.components_ = pip_opt.named_steps['pca'].components_
+        self.coef_ = pip_opt.named_steps['lasso'].coef_
+
+        # Save weights in feature space
+        self.weights_ = self.get_weights()
+
+        return self
+
+
+class LogisticPCR(BasePCR):
+
+    def __init__(self,
+                 scale=False,
+                 cv=None,
+                 Cs=10,
+                 pca_kws=None,
+                 logistic_kws=None,
+                 scoring='balanced_accuracy',
+                 n_jobs=None,
+                 verbose=0
+                 ):
+
+        self.scale = scale
+        self.cv = cv
+        self.Cs = Cs
+        self.pca_kws = pca_kws
+        self.logistic_kws = logistic_kws
+        self.scoring = scoring
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+
+    def fit(self, X, y):
+
+        # Checkings here
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+
+        cv = check_cv(self.cv, y, classifier=True)
+        splits = list(cv.split(X, y,))
+
+        if isinstance(self.Cs, int):
+            Cs = np.logspace(-4, 4, self.Cs)
+        else:
+            Cs = self.Cs
+        self.Cs_ = Cs
+
+        pip_transf = self._get_pca()
+
+        if self.logistic_kws is None:
+            clf = LogisticRegression()
+        else:
+            clf = LogisticRegression(**self.logistic_kws)
+
+        logistic_kws = clf.get_params()
+        logistic_kws.pop('C')
+        self.logistic_kws = logistic_kws
+
+        estimators = [LogisticRegression(C=C, **logistic_kws) for C in
+                      self.Cs_]
+
+        self.scorer_ = get_scorer(self.scoring)
+
+        parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)
+
+        scores_cv = parallel(
+            delayed(_cv_optimize)(
+                estimators.copy(), X, y, train, val,
+                clone(pip_transf),
+                self.scorer_
+                ) for train, val in splits)
+        scores_cv = np.column_stack(scores_cv)
+
+        self.scores_cv_ = scores_cv
+        scores_cv_mean = np.mean(scores_cv, axis=1)
+        c_opt = self.Cs_[np.argmax(scores_cv_mean)]
+        self.C_ = c_opt
+
+        clf_opt = LogisticRegression(C=c_opt, **logistic_kws)
+        pip_opt = clone(pip_transf)
+        pip_opt.steps.append(make_pipeline(clf_opt).steps[0])
+        pip_opt.fit(X, y)
+        self.best_estimator_ = pip_opt
+
+        # Save singular matrix and beta coefficients in component space
+        self.components_ = pip_opt.named_steps['pca'].components_
+        self.coef_ = pip_opt.named_steps['logisticregression'].coef_
         # Save weights in feature space
         self.weights_ = self.get_weights()
 
@@ -294,7 +394,7 @@ def _cv_optimize(cv_estims,
     # Generate list of estimators to fit
     estimators_fit = [estim.fit(X_train_trans, y_train)
                       for estim in cv_estims]
-    scores = [score(y_val, estim.predict(X_val_trans))
+    scores = [score(estim, X_val_trans, y_val)
               for estim in estimators_fit]
     return scores
 
