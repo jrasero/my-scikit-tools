@@ -14,6 +14,7 @@ from my_sklearn_tools.pca_regressors import LassoPCR, LogisticPCR
 
 
 def test_lasso_pcr():
+    """compare LassoPCR with the same using GridSearchCV"""
 
     X, y = datasets.load_diabetes(return_X_y=True)
     X_train, y_train = X[:300], y[:300]
@@ -65,6 +66,7 @@ def test_lasso_pcr():
 
 
 def test_logistic_pcr():
+    """compare logisticPCR with the same using GridSearchCV"""
 
     X, y = datasets.load_breast_cancer(return_X_y=True)
     X_train, y_train = X[:50], y[:50]
@@ -115,3 +117,37 @@ def test_logistic_pcr():
     print("time using GridSearchCV: %f s,"
           " time using LogisticPCR object: %f s" % (time_1, time_2))
     assert time_1 > time_2
+
+
+def test_penaly_logistic_pcr():
+    """test that penalty in logisticPCR works"""
+
+    X, y = datasets.make_classification(n_samples=50,
+                                        n_features=100,
+                                        n_informative=10,
+                                        n_redundant=20)
+
+    log_pcr = LogisticPCR(cv=5, Cs=10,
+                          pca_kws={'n_components': 30},
+                          logistic_kws={'random_state': 0, 'max_iter': 10000,
+                                        'penalty': 'l2', 'solver': 'liblinear'}
+                          )
+
+    log_pcr.fit(X, y)
+    components_l2 = log_pcr.components_
+    non_zero_coefs_l2 = sum(abs(log_pcr.coef_[0, :]) > 0)
+
+    log_pcr = LogisticPCR(cv=5, Cs=10,
+                          pca_kws={'n_components': 30},
+                          logistic_kws={'random_state': 0, 'max_iter': 10000,
+                                        'penalty': 'l1', 'solver': 'liblinear'}
+                          )
+
+    log_pcr.fit(X, y)
+    components_l1 = log_pcr.components_
+    non_zero_coefs_l1 = sum(abs(log_pcr.coef_[0, :]) > 0)
+
+    # The PCA components should be the same no matter which penalty used
+    assert np.allclose(components_l2, components_l1)
+    assert non_zero_coefs_l2 == 30  # The number of components, no shrinkage
+    assert non_zero_coefs_l1 < non_zero_coefs_l2

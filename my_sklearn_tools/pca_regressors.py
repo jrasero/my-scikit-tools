@@ -272,6 +272,10 @@ class LassoPCR(BasePCR):
         pip_opt.fit(X, y)
         self.best_estimator_ = pip_opt
 
+        # Save singular matrix and beta coefficients in component space
+        self.components_ = pip_opt.named_steps['pca'].components_
+        self.coef_ = pip_opt.named_steps['lasso'].coef_
+
         # Save weights in feature space
         self.weights_ = self.get_weights()
 
@@ -352,6 +356,9 @@ class LogisticPCR(BasePCR):
         pip_opt.fit(X, y)
         self.best_estimator_ = pip_opt
 
+        # Save singular matrix and beta coefficients in component space
+        self.components_ = pip_opt.named_steps['pca'].components_
+        self.coef_ = pip_opt.named_steps['logisticregression'].coef_
         # Save weights in feature space
         self.weights_ = self.get_weights()
 
