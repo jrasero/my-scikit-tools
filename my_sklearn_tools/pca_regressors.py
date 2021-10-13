@@ -1,6 +1,5 @@
 import numpy as np
 from joblib import Memory
-import numbers
 from tempfile import mkdtemp
 from joblib import Parallel, delayed
 
@@ -163,19 +162,23 @@ class BasePCR(BaseEstimator):
 
         check_is_fitted(self)
 
-        return self.best_estimator_.score(X, y)
+        return self.scorer_(self.best_estimator_, X, y)
 
     def get_weights(self):
 
         check_is_fitted(self)
 
         V = self.best_estimator_.named_steps['pca'].components_
-        beta = self.best_estimator_.named_steps[-1].coef_
+        beta = self.best_estimator_.steps[-1][1].coef_
         insert_features = self.best_estimator_.\
             named_steps['variancethreshold'].inverse_transform
-        w = V.T @ beta
+        if beta.ndim == 1:
+            beta = beta[None, :]
+        w = beta @ V.T
         # Insert discarded voxels
-        w = np.squeeze(insert_features(w[None, :]))
+        w = insert_features(w)
+        if w.shape[0] == 0:
+            w = w[0, :]
         return w
 
     def _get_pca(self):
@@ -247,13 +250,15 @@ class LassoPCR(BasePCR):
 
         estimators = [Lasso(alpha=alpha, **lasso_kws) for alpha in alphas]
 
-        score = get_scorer(self.scoring)
+        self.scorer_ = get_scorer(self.scoring)
 
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)
 
         scores_cv = parallel(
             delayed(_cv_optimize)(
-                estimators.copy(), X, y, train, val, clone(pip_transf), score
+                estimators.copy(), X, y, train, val,
+                clone(pip_transf),
+                self.scorer_
                 ) for train, val in splits)
         scores_cv = np.column_stack(scores_cv)
         self.scores_cv_ = scores_cv
@@ -324,15 +329,18 @@ class LogisticPCR(BasePCR):
         estimators = [LogisticRegression(C=C, **logistic_kws) for C in
                       self.Cs_]
 
-        score = get_scorer(self.scoring)
+        self.scorer_ = get_scorer(self.scoring)
 
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)
 
         scores_cv = parallel(
             delayed(_cv_optimize)(
-                estimators.copy(), X, y, train, val, clone(pip_transf), score
+                estimators.copy(), X, y, train, val,
+                clone(pip_transf),
+                self.scorer_
                 ) for train, val in splits)
         scores_cv = np.column_stack(scores_cv)
+
         self.scores_cv_ = scores_cv
         scores_cv_mean = np.mean(scores_cv, axis=1)
         c_opt = self.Cs_[np.argmax(scores_cv_mean)]
@@ -379,7 +387,7 @@ def _cv_optimize(cv_estims,
     # Generate list of estimators to fit
     estimators_fit = [estim.fit(X_train_trans, y_train)
                       for estim in cv_estims]
-    scores = [score(y_val, estim.predict(X_val_trans))
+    scores = [score(estim, X_val_trans, y_val)
               for estim in estimators_fit]
     return scores
 

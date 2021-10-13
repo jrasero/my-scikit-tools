@@ -60,6 +60,7 @@ class StratifiedKFoldReg(StratifiedKFold):
 
         return super().split(X, y_labels, groups)
 
+
 def check_cv(cv=5, y=None, *, classifier=False):
     """Input checker utility for building a cross-validator
     Parameters
