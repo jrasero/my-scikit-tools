@@ -364,6 +364,16 @@ class LogisticPCR(BasePCR):
 
         return self
 
+    def predict_proba(self, X):
+
+        check_is_fitted(self)
+        return self.best_estimator_.predict_proba(X)
+
+    def predict_log_proba(self, X):
+
+        check_is_fitted(self)
+        return self.best_estimator_.predict_log_proba(X)
+
 
 class RidgePCR(BasePCR):
 

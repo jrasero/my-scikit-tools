@@ -94,6 +94,7 @@ def test_logistic_pcr():
 
     time_1 = t_f-t_0
     y_pred_1 = clf.predict(X_test)
+    y_pred_prob_1 = clf.predict_proba(X_test)
     score_1 = clf.score(X_test, y_test)
     c_opt_1 = clf.best_params_['logisticregression__C']
 
@@ -107,10 +108,12 @@ def test_logistic_pcr():
 
     time_2 = t_f-t_0
     y_pred_2 = log_pcr.predict(X_test)
+    y_pred_prob_2 = log_pcr.predict_proba(X_test)
     score_2 = log_pcr.score(X_test, y_test)
     c_opt_2 = log_pcr.C_
 
     assert np.allclose(y_pred_1, y_pred_2)
+    assert np.allclose(y_pred_prob_1, y_pred_prob_2)
     assert score_1 == score_2
     assert c_opt_1 == c_opt_2
 
