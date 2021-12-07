@@ -275,7 +275,7 @@ class LassoPCR(BasePCR):
         # Save singular matrix and beta coefficients in component space
         self.components_ = pip_opt.named_steps['pca'].components_
         self.coef_ = pip_opt.named_steps['lasso'].coef_
-        self.intercept__ = pip_opt.named_steps['lasso'].intercept_
+        self.intercept_ = pip_opt.named_steps['lasso'].intercept_
 
         # Save weights in feature space
         self.weights_ = self.get_weights()
@@ -360,7 +360,7 @@ class LogisticPCR(BasePCR):
         # Save singular matrix and beta coefficients in component space
         self.components_ = pip_opt.named_steps['pca'].components_
         self.coef_ = pip_opt.named_steps['logisticregression'].coef_
-	self.intercept_ = pip_opt.named_steps['logisticregression'].intercept_
+        self.intercept_ = pip_opt.named_steps['logisticregression'].intercept_
 
         # Save weights in feature space
         self.weights_ = self.get_weights()
