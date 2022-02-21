@@ -10,6 +10,7 @@ from sklearn.linear_model import (LogisticRegressionCV, RidgeClassifierCV,
                                   LassoCV, RidgeCV, ElasticNetCV,
                                   LogisticRegression, RidgeClassifier,
                                   Lasso, Ridge, ElasticNet)
+from sklearn.preprocessing import LabelEncoder
 from my_sklearn_tools.model_selection import check_cv
 from sklearn.utils.validation import check_is_fitted
 
@@ -33,6 +34,17 @@ class BaseTransmodal(TransformerMixin):
         self.verbose = verbose
 
     def fit(self, X, y, sample_weight=None):
+        # Fit first level estimators
+        X_multi = self._fit_first(X, y, sample_weight)
+        # Fit final estimator
+        _fit_single_estimator(
+            self.final_estimator_, X_multi, y,
+            sample_weight=sample_weight
+        )
+
+        return self
+
+    def _fit_first(self, X, y, sample_weight):
 
         X = self._validate_datasets(X)
 
@@ -68,7 +80,7 @@ class BaseTransmodal(TransformerMixin):
                             for estim, x in zip(estims_fitted, X)
                             ]
 
-        X_multi = Parallel(n_jobs=self.n_jobs)(
+        preds = Parallel(n_jobs=self.n_jobs)(
             delayed(cross_val_predict)(est,
                                        x,
                                        y,
@@ -79,22 +91,30 @@ class BaseTransmodal(TransformerMixin):
             for est, x in zip(self.estimators_, X)
             )
 
-        X_multi = np.column_stack(X_multi)
+        X_multi = self._concatenate_predictions(preds)
 
+        return X_multi
+
+    def fit_transform(self, X, y, sample_weight=None):
+
+        # Fit first level estimators
+        X_multi = self._fit_first(X, y, sample_weight)
+
+        # Fit final estimator
         _fit_single_estimator(
             self.final_estimator_, X_multi, y,
             sample_weight=sample_weight
         )
 
-        return self
+        return X_multi
 
     def _transform(self, X):
         """Concatenate and return the predictions of the estimators."""
-        X_multi = [
-            getattr(est, self.stack_method_)(x)
+        preds = [
+            getattr(est, self.stack_method)(x)
             for x, est in zip(X, self.estimators_)
             ]
-        return np.column_stack(X_multi)
+        return self._concatenate_predictions(preds)
 
     def _validate_estimators(self):
 
@@ -110,9 +130,9 @@ class BaseTransmodal(TransformerMixin):
             estimators = self.estimators
             if len(estimators) != self.n_channels_:
                 raise ValueError("estimator is a list of estimators, with "
-                                 f" {len(estimators)} components, which is"
+                                 f"{len(estimators)} components, which is "
                                  "different from the number of channels, "
-                                 f" here equal to {self.n_channels}"
+                                 f"here equal to {self.n_channels_}"
                                  )
 
             if is_classifier(estimators[0]):
@@ -133,11 +153,37 @@ class BaseTransmodal(TransformerMixin):
 
         if n_channels is not None:
             if len(X) != n_channels:
-                raise ValueError(f"A list of {n_channels} was supplied, but"
-                                 f"{self.n_channels_} was expected")
+                raise ValueError(f"A list of {len(X)} was supplied, but "
+                                 f"{n_channels} was expected")
 
         check_consistent_length(*X)
         return X
+
+    def _concatenate_predictions(self, predictions):
+        """Concatenate the predictions of each first-level estimators.
+
+        This helper is in charge of ensuring the predictions are 2D arrays and
+        it will drop one of the probability column when using probabilities
+        in the binary case. Indeed, the p(y|c=0) = 1 - p(y|c=1)
+        """
+        X_multi = []
+        for preds in predictions:
+            # case where the the estimator returned a 1D array
+            if preds.ndim == 1:
+                X_multi.append(preds.reshape(-1, 1))
+            else:
+                if (
+                    self.stack_method == "predict_proba"
+                    and len(self.classes_) == 2
+                ):
+                    # Remove the first column when using probabilities in
+                    # binary classification because both features are perfectly
+                    # collinear.
+                    X_multi.append(preds[:, 1:])
+                else:
+                    X_multi.append(preds)
+
+        return np.column_stack(X_multi)
 
     # @abstractmethod
     def _validate_final_estimator(self, cv):
@@ -225,7 +271,42 @@ class TransmodalClassifer(BaseTransmodal):
                              "binary"
                              )
 
+        self._le = LabelEncoder().fit(y)
+        self.classes_ = self._le.classes_
+
         return super().fit(X, y, sample_weight)
+
+    def fit_transform(self, X, y, sample_weight=None):
+        """Fit the estimators.
+
+        Parameters
+        ----------
+        X : list of {arrays-like, sparse matrix} of
+            shapes (n_samples, m_i), where is the number of samples and
+            m_i is the number of features for the dataset i.
+        y : array-like of shape (n_samples,)
+            Target values.
+        sample_weight : array-like of shape (n_samples,) or default=None
+            Sample weights. If None, then samples are equally weighted.
+            Note that this is supported only if all underlying estimators
+            support sample weights.
+
+        Returns
+        -------
+        self : object
+        """
+
+        y_type = type_of_target(y)
+
+        if y_type != "binary":
+            raise ValueError("outcome should be (for now) "
+                             "binary"
+                             )
+
+        self._le = LabelEncoder().fit(y)
+        self.classes_ = self._le.classes_
+
+        return super().fit_transform(X, y, sample_weight)
 
     def predict(self, X):
         """Predict target for a list of datasets X.
@@ -282,8 +363,8 @@ class TransmodalClassifer(BaseTransmodal):
             estimator = getattr(estim, "best_estimator_")
         elif isinstance(estim, (LogisticRegressionCV, RidgeClassifierCV)):
             if isinstance(estim, LogisticRegressionCV):
-                estimator = LogisticRegression(C=estim.C_,
-                                               l1_ratio=estim.l1_ratio_
+                estimator = LogisticRegression(C=estim.C_[0],
+                                               l1_ratio=estim.l1_ratio_[0]
                                                )
             elif isinstance(estim, RidgeClassifierCV):
                 estimator = RidgeClassifier(alpha=estim.alpha_)
@@ -297,6 +378,7 @@ class TransmodalClassifer(BaseTransmodal):
             # Return fitted, that is, with coef and intercept
             estimator.coef_ = estim.coef_
             estimator.intercept_ = estim.intercept_
+            estimator.classes_ = estim.classes_
         else:
             estimator = estim
         return estimator
