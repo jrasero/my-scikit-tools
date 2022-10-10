@@ -1,1 +1,1 @@
-__all__ = ["pca_regressors", "model_selection", "cpm"]
+__all__ = ["pca_regressors", "model_selection", "cpm", "transmodal", "preprocessing"]
