@@ -6,9 +6,9 @@ import numbers
 from sklearn.model_selection import StratifiedKFold
 from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import type_of_target
-from sklearn.model_selection._split import _CVIterableWrapper
+from sklearn.model_selection._split import _CVIterableWrapper, _RepeatedSplits
 
-__all__ = ['StratifiedKFoldReg', 'check_cv']
+__all__ = ['StratifiedKFoldReg', 'RepeatedStratifiedKFoldReg', 'check_cv']
 
 
 class StratifiedKFoldReg(StratifiedKFold):
@@ -106,3 +106,37 @@ def check_cv(cv=5, y=None, *, classifier=False):
         return _CVIterableWrapper(cv)
 
     return cv  # New style cv objects are passed without any modification
+
+
+class RepeatedStratifiedKFoldReg(_RepeatedSplits):
+    """Repeated Stratified K-Fold cross validator for Regression problems.
+    Repeats Stratified K-Fold n times with different randomization in each
+    repetition.
+    
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+    n_repeats : int, default=10
+        Number of times cross-validator needs to be repeated.
+    random_state : int, RandomState instance or None, default=None
+        Controls the generation of the random states for each repetition.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+    
+    
+    Notes
+    -----
+    Randomized CV splitters may return different results for each call of
+    split. You can make the results identical by setting `random_state`
+    to an integer.
+  
+    """
+
+    def __init__(self, *, n_splits=5, n_repeats=10, random_state=None):
+        super().__init__(
+            StratifiedKFoldReg,
+            n_repeats=n_repeats,
+            random_state=random_state,
+            n_splits=n_splits,
+        )
