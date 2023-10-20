@@ -385,34 +385,34 @@ class TransmodalClassifer(BaseTransmodal):
 
 
 class TransmodalRegressor(BaseTransmodal):
-     """Transmodal Regressor.
-    
-     A transmodal regressor consists in stacking the output from
-     a list of datasets (first stage) and feed these predictions to a
-     new regressor to yield the final prediction (second stage)
-     It allows to exploit the strength of each individual dataset
-     by using their output as input of a final regressor.
-    
-     Parameters
-     ----------
-     estimators : estimator or list of estimators.
-         Estimators that fit each piece of input data. There should be as
-         many estimators as datasets. If only one estimator is supplied,
-         then that is fitted to all datasets.
-     final_estimator : estimator, default=None
-         A regressor which will combine the first-level estimators.
-         If none, a LassoCV will be used
-     cv : int, cross-validation generator or an iterable, default=None
-         Determines the cross-validation strategy used to generate the
-         out-of-sample predictions in the training set. This cv is also
-         used to tune the first-level estimators, in case they accept
-         such argument (e.g. GridSearchCV).
-     n_jobs : int, default=None
-         The number of jobs to run in parallel.
-     verbose : int, default=0
-         Verbosity level.
-    
-     """
+    """Transmodal Regressor.
+   
+    A transmodal regressor consists in stacking the output from
+    a list of datasets (first stage) and feed these predictions to a
+    new regressor to yield the final prediction (second stage)
+    It allows to exploit the strength of each individual dataset
+    by using their output as input of a final regressor.
+   
+    Parameters
+    ----------
+    estimators : estimator or list of estimators.
+        Estimators that fit each piece of input data. There should be as
+        many estimators as datasets. If only one estimator is supplied,
+        then that is fitted to all datasets.
+    final_estimator : estimator, default=None
+        A regressor which will combine the first-level estimators.
+        If none, a LassoCV will be used
+    cv : int, cross-validation generator or an iterable, default=None
+        Determines the cross-validation strategy used to generate the
+        out-of-sample predictions in the training set. This cv is also
+        used to tune the first-level estimators, in case they accept
+        such argument (e.g. GridSearchCV).
+    n_jobs : int, default=None
+        The number of jobs to run in parallel.
+    verbose : int, default=0
+        Verbosity level.
+   
+    """
     def __init__(self,
                  estimators,
                  final_estimator=None,
@@ -421,7 +421,6 @@ class TransmodalRegressor(BaseTransmodal):
                  n_jobs=1,
                  verbose=0):
        
-
         super().__init__(
             estimators=estimators,
             final_estimator=final_estimator,
@@ -430,7 +429,7 @@ class TransmodalRegressor(BaseTransmodal):
             n_jobs=n_jobs,
             verbose=verbose,
             )
-
+        
     def fit(self, X, y, sample_weight=None):
         """Fit the estimators.
 
