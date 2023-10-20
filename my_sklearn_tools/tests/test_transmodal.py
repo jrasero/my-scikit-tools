@@ -188,13 +188,13 @@ def test_transmodal_clf():
                            )
 
     # Test having different first-level estimators
-    trans_clf = TransmodalClassifer([LogisticRegressionCV(max_iter=1e6),
+    trans_clf = TransmodalClassifer([LogisticRegressionCV(max_iter=int(1e6)),
                                      LogisticRegression()],
                                     cv=cv)
     X_train_multi = trans_clf.fit_transform([X_1, X_2], y)
     X_test_multi = trans_clf.transform([X_1, X_2])
 
-    logistic_cv = LogisticRegressionCV(cv=cv, max_iter=1e6)
+    logistic_cv = LogisticRegressionCV(cv=cv, max_iter=int(1e6))
     logistic_cv.fit(X_1, y)
     # Test training set predictions
     assert np.allclose(X_train_multi[:, 0],
